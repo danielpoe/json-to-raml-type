@@ -1,0 +1,177 @@
+<html>
+<head>
+    <style>
+        table {
+            width: 100%
+        }
+        table td {
+            width: 50%;
+            vertical-align: top;
+        }
+        textarea {
+            width: 100%;
+            height: 400px
+        }
+        .bad {
+            color: red
+        }
+        #result {
+            display: block;
+            border: 1px solid black;
+            min-height: 400px;
+        }
+        body {
+            padding: 20px;
+            font-family: sans-serif;
+        }
+    </style>
+    <script
+            src="http://code.jquery.com/jquery-3.2.1.js"
+            integrity="sha256-DZAnKJ/6XZ9si04Hgrsxu/8s717jcIzLy3oi35EouyE="
+            crossorigin="anonymous"></script>
+    <script>
+        var stackWithAdditionalSubtypes = {}
+        var additionalTypesCounter = 1
+
+        $( document ).ready(function() {
+
+            $( "button#action" ).on( "click", function( event ) {
+
+                try {
+                    var theJson = jQuery.parseJSON($("#json").val())
+                    try {
+
+                        var ramlType = jsonToRaml(theJson, $("#enable_subtypes").prop("checked"))
+
+                        $("#result").html($(ramlType).addClass("good"));
+                    } catch (e) {
+                        $("#result").html($("<h2>Error parsing to raml</h2><p>" + e.message + "</p>").addClass("bad"));
+
+                    }
+
+                }
+                catch (e) {
+                    $("#result").html($("<h1>Invalid Json</h1><p>" + e.message + "</p>").addClass("bad"));
+
+                }
+
+            });
+        });
+
+        /**
+         * Indents the given string
+         * @param {string} str  The string to be indented.
+         * @param {number} numOfIndents  The amount of indentations in spaces to place at the
+         *     beginning of each line of the string.
+         * @return {string}  The new string with each line beginning with the desired
+         *     amount of indentation.
+         */
+        function indent(str, numOfIndents) {
+            str = str.replace(/^(?=.)/gm, new Array(numOfIndents + 1).join(' '));
+            return str;
+        }
+
+        /**
+         *
+         * @param json
+         * @param boolean
+         * @returns {string}
+         */
+        function jsonToRaml(json, withSubTypes) {
+            var result = ""
+            result += "<h2>Main Type:</h2><pre>"+jsonPartToRaml(json,withSubTypes)+"</pre>"
+
+            while (Object.keys(stackWithAdditionalSubtypes).length >0) {
+                for (var prop in stackWithAdditionalSubtypes) {
+                    result += "<h3>Type: "+prop+"</h3>"
+                    result += "<pre>"+jsonPartToRaml(stackWithAdditionalSubtypes[prop], withSubTypes)+"</pre>"
+                    delete stackWithAdditionalSubtypes[prop]
+                }
+            }
+            return result
+
+        }
+        /**
+         *
+         * @param json
+         * @param boolean
+         * @returns {string}
+         */
+        function jsonPartToRaml(json, withSubTypes) {
+            switch (typeof json) {
+                case 'string':
+                    return "type: string\n"
+                            + "example: "+json+"\n";
+                case 'number':
+                    return "type: integer\n"
+                            + "example: "+json+"\n";
+                case 'object':
+                    if( Object.prototype.toString.call( json ) === '[object Array]' ) {
+                        if (withSubTypes && json.length > 0) {
+                            var typeName = "SubType_"+additionalTypesCounter++
+                            stackWithAdditionalSubtypes[typeName]=json[0]
+                            return "type: "+typeName+"[]\n"
+                        } else if (json.length > 0) {
+                            return "type: array\n"
+                                    +"items:\n"
+                                    +indent(jsonPartToRaml(json[0],withSubTypes),2)
+                        } else {
+                            return "type: array\n"
+                        }
+
+                    } else {
+                        //real OBJECT
+                        var result = "type: object\n"
+                                + "properties:\n";
+                        for(var propt in json){
+                            result += "  "+propt + ":\n"+ indent(jsonPartToRaml(json[propt],withSubTypes),4)+"\n";
+                        }
+                        return result
+                    }
+
+
+                case 'boolean':
+                    return "type: boolean\n"
+                            + "example: "+json+"\n";
+                default:
+                    return "UNKNOWN TYPE"+typeof json+"\n";
+            }
+
+
+        }
+
+    </script>
+</head>
+<body>
+<h1>Online JSON to RAML Type Conversion</h1>
+<table>
+    <tr>
+        <td>
+            <h3>Paste your sample JSON</h3>
+            <textarea id="json">
+{
+    "string": "test",
+    "integer": 888,
+    "bool": true,
+    "array": [2,3,4],
+    "arrayOfObject": [
+       {"test":"test"}
+    ]
+}
+</textarea>
+            <input type="checkbox" id="enable_subtypes"/> Arrays as Subtypes?<br/>
+            <button id="action">Convert to Raml Type</button>
+        </td>
+        <td>
+            <h3>See your result</h3>
+            <div id="result">
+
+            </div>
+        </td>
+    </tr>
+</table>
+
+
+
+</body>
+</html>
